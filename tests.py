@@ -49,6 +49,8 @@ class TestCase(unittest.TestCase):
         gru.forward_propagation(input_data)
         tt = time.time() - t0
         print("\nGRU forward propagation %s sec\n" %str(tt))
+        # print("Expected loss from random predictions %d" %np.log(8000))
+        # print("Actual loss %d" %gru.calculate_loss(np.arange(1000).reshape(2,2), np.arange(1000).reshape(2,2)))
 
     def tearDown(self):
         pass
