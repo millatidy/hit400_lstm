@@ -7,9 +7,7 @@ from models.rnn_theano import RNN_THEANO
 from models.gru import GRU
 
 class TestCase(unittest.TestCase):
-    def setUp(self):
-        rnn = RNN(8000,100, 8000)
-        input_data = np.arange(15000)
+    pass
 
     # Vanila RNN TestCASE
     def test_vanilla_rnn(self):
@@ -38,12 +36,12 @@ class TestCase(unittest.TestCase):
 
     def test_vanilla_gru(self):
         gru = GRU(8000,100)
-        assert gru.X_z.dtype == "float64"
-        assert gru.X_r.dtype == "float64"
-        assert gru.X_h.dtype == "float64"
-        assert gru.Y_z.dtype == "float64"
-        assert gru.Y_r.dtype == "float64"
-        assert gru.Y_h.dtype == "float64"
+        assert gru.X[0].dtype == "float64"
+        assert gru.X[1].dtype == "float64"
+        assert gru.X[2].dtype == "float64"
+        assert gru.Y[0].dtype == "float64"
+        assert gru.Y[1].dtype == "float64"
+        assert gru.Y[2].dtype == "float64"
         input_data = np.arange(8000)
         t0 = time.time()
         gru.forward_propagation(input_data)
