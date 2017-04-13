@@ -26,16 +26,15 @@ class TheanoRNN:
 
         def forward_propagation_step(x_t, h_prev, U, V, W):
             h_t = T.tanh(U[:,x_t] + W.dot(h_prev))
-            o = T.nnet.softmax(V.dot(h))
-            return [o[0], h_t]
+            o_t = T.nnet.softmax(V.dot(h_t))
+            return [o_t[0], h_t]
 
-        [o, h]; _ = theano.scan(
+        [o, h], updates = theano.scan(
             forward_propagation_step,
-            sequences=[x],
+            sequences=x,
             non_sequences=[U, V, W],
-            outputs_info=[None, dict(initialize=T.zeros(self.hidden_dim))],
-            strict=True
-        )
+            outputs_info=[None, dict(initial=T.zeros(self.hidden_dim))],
+            strict=True)
 
         prediction = T.argmax(o, axis=1)
 
