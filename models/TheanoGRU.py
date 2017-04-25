@@ -6,7 +6,7 @@ floatX = theano.config.floatX
 
 class TheanoGRU:
 
-    def __init__(self, io_dim, hidden_dim=200, bppt_truncate=-1):
+    def __init__(self, io_dim, hidden_dim=300, bppt_truncate=-1):
         # assign class variables
         self.io_dim = io_dim
         self.hidden_dim = hidden_dim
@@ -23,7 +23,7 @@ class TheanoGRU:
         self.U = theano.shared(name='U', value=U.astype(floatX))
         self.V = theano.shared(name='V', value=V.astype(floatX))
 
-        # SGD / rmsprop: Initialize parameters
+        # SGD
         self.mE = theano.shared(name='mE', value=np.zeros(E.shape).astype(theano.config.floatX))
         self.mW = theano.shared(name='mW', value=np.zeros(W.shape).astype(theano.config.floatX))
         self.mU = theano.shared(name='mU', value=np.zeros(U.shape).astype(theano.config.floatX))
@@ -36,16 +36,17 @@ class TheanoGRU:
     def __theano_build__(self):
         E, U, W, V = self.E, self.U, self.W, self.V
 
-        x = T.ivector('x')
-        y = T.ivector('y')
+        x = T.fvector('x')
+        y = T.fvector('y')
 
-        # gated recurnet unit
-        # from: Learning Phrase Representations using RNN Encoder-Decoder for Statistical Machine Translation (Cho et al, 2014)
-        def forward_propagation_step(x_t, h_t_prev, E, U, W, V):
+        # GRU Encoder
+        def encoder(x_t, h_t_prev, E, U, W, V):
             # word embeding layer
             x_e = E[:,x_t]
+
             z_t = T.nnet.sigmoid(W[0].dot(x_e) + U[0].dot(h_t_prev))
             r_t = T.nnet.sigmoid(W[1].dot(x_e) + U[1].dot(h_t_prev))
+
             _h_t = T.tanh(W[2].dot(x_e) + U[2].dot(h_t_prev * r_t))
             h_t = (T.ones_like(z_t) - z_t) * h_t_prev + z_t * _h_t
 
@@ -53,6 +54,15 @@ class TheanoGRU:
             # the row we want
             o_t = T.nnet.softmax(V.dot(h_t))[0]
             return [o_t, h_t]
+
+        def decoder():
+            pass
+
+        # gated recurnet unit
+        # from: Learning Phrase Representations using RNN Encoder-Decoder for Statistical Machine Translation (Cho et al, 2014)
+        def forward_propagation_step(x_t, h_t_prev, E, U, W, V):
+            # encode
+            return encoder(x_t, h_t_prev, E, U, W, V)
 
         # more to be done here
         [o, h], updates = theano.scan(
@@ -91,7 +101,7 @@ class TheanoGRU:
         mW = decay * self.mW + (1 - decay) * dW ** 2
         mV = decay * self.mV + (1 - decay) * dV ** 2
 
-        self.sdg_step = theano.function(
+        self.sgd_step = theano.function(
                 [x, y, learning_rate, theano.In(decay, value=0.9)],
                 [],
                 updates = [
