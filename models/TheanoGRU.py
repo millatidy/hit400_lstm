@@ -2,7 +2,12 @@ import theano
 import theano.tensor as T
 import numpy as np
 
-floatX = theano.config.floatX
+floatX = theano.config.floatX # pick system architecture at runtime
+# floatX = np.float32 # when running on GPU
+# floatX = np.float64 # when running on CPU
+'''
+    NeXT step screw EW variables
+'''
 
 class TheanoGRU:
 
@@ -13,6 +18,7 @@ class TheanoGRU:
         self.bppt_truncate = bppt_truncate
         # initialize weights
         E = np.random.uniform(-np.sqrt(1./self.io_dim), np.sqrt(1./self.io_dim), (self.hidden_dim, self.io_dim))
+        # E = np.random.randn(io_dim, hidden_dim)
         W = np.random.uniform(-np.sqrt(1./self.hidden_dim), np.sqrt(1./self.hidden_dim), (3, self.hidden_dim, self.hidden_dim))
         U = np.random.uniform(-np.sqrt(1./self.hidden_dim), np.sqrt(1./self.hidden_dim), (3, self.hidden_dim, self.hidden_dim))
         V = np.random.uniform(-np.sqrt(1./self.hidden_dim), np.sqrt(1./self.hidden_dim), (self.io_dim, self.hidden_dim))
@@ -24,10 +30,10 @@ class TheanoGRU:
         self.V = theano.shared(name='V', value=V.astype(floatX))
 
         # SGD
-        self.mE = theano.shared(name='mE', value=np.zeros(E.shape).astype(theano.config.floatX))
-        self.mW = theano.shared(name='mW', value=np.zeros(W.shape).astype(theano.config.floatX))
-        self.mU = theano.shared(name='mU', value=np.zeros(U.shape).astype(theano.config.floatX))
-        self.mV = theano.shared(name='mV', value=np.zeros(V.shape).astype(theano.config.floatX))
+        self.mE = theano.shared(name='mE', value=np.zeros(E.shape).astype(floatX))
+        self.mW = theano.shared(name='mW', value=np.zeros(W.shape).astype(floatX))
+        self.mU = theano.shared(name='mU', value=np.zeros(U.shape).astype(floatX))
+        self.mV = theano.shared(name='mV', value=np.zeros(V.shape).astype(floatX))
 
         # Store our graph here
         self.theano = {}
@@ -36,17 +42,28 @@ class TheanoGRU:
     def __theano_build__(self):
         E, U, W, V = self.E, self.U, self.W, self.V
 
-        x = T.fvector('x')
-        y = T.fvector('y')
+        x = T.ivector('x')
+        y = T.ivector('y')
 
         # GRU Encoder
         def encoder(x_t, h_t_prev, E, U, W, V):
             # word embeding layer
             x_e = E[:,x_t]
-
+            W0 = W[0]
+            W1 = W[1]
+            W2 = W[2]
+            # z_t = x_t.dot(E)
+            # r_t = x_t.dot(E)
+            # _h_t = x_t.dot(E)
+            # z_t = T.nnet.sigmoid(W0[:,x_t] + W[0] + U[0].dot(h_t_prev))
+            # r_t = T.nnet.sigmoid(W1[:,x_t] + U[1].dot(h_t_prev))
+            # _h_t = T.tanh(W2[:,x_t] + U[2].dot(h_t_prev * r_t))
+            # z_t = T.nnet.sigmoid(W[0].dot(x_t) + U[0].dot(h_t_prev))
+            # r_t = T.nnet.sigmoid(W[1].dot(x_t) + U[1].dot(h_t_prev))
+            # _h_t = T.tanh(W[2].dot(x_t) + U[2].dot(h_t_prev * r_t))
+            # h_t = (T.ones_like(z_t) - z_t) * h_t_prev + z_t * _h_t
             z_t = T.nnet.sigmoid(W[0].dot(x_e) + U[0].dot(h_t_prev))
             r_t = T.nnet.sigmoid(W[1].dot(x_e) + U[1].dot(h_t_prev))
-
             _h_t = T.tanh(W[2].dot(x_e) + U[2].dot(h_t_prev * r_t))
             h_t = (T.ones_like(z_t) - z_t) * h_t_prev + z_t * _h_t
 
@@ -63,7 +80,6 @@ class TheanoGRU:
         def forward_propagation_step(x_t, h_t_prev, E, U, W, V):
             # encode
             return encoder(x_t, h_t_prev, E, U, W, V)
-
         # more to be done here
         [o, h], updates = theano.scan(
             forward_propagation_step,
@@ -89,7 +105,7 @@ class TheanoGRU:
         self.predict = theano.function([x], o)
         self.prediction_class = theano.function([x], prediction)
         self.c_error = theano.function([x,y], cost)
-        self.bptt = theano.function([x, y], [dE, dW, dU, dV])
+        self.bptt = theano.function([x, y], [dW, dU, dV])
 
         # SDG parameters
         learning_rate = T.scalar('learning_rate')
@@ -109,7 +125,7 @@ class TheanoGRU:
                             (W, W - learning_rate * dW / T.sqrt(mW + 1e-6)),
                             (U, U - learning_rate * dU / T.sqrt(mU + 1e-6)),
                             (V, V - learning_rate * dV / T.sqrt(mV + 1e-6)),
-                            (self.mE, mE),
+                            # (self.mE, mE),
                             (self.mU, mU),
                             (self.mW, mW),
                             (self.mV, mV)
